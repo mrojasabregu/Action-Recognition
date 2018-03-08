@@ -36,4 +36,5 @@ Keeping in mind the computational complexity of the task, the algorithm is as fo
     a one dimensional neural network ([1D-CN](https://github.com/RameenAbdal/Action-Recognition/blob/master/Train_1d.py)) is used to extract temporal features from these sequences. In this way two separate pipelined networks used.
     One acts as a decoder extracting mainly the spatial information and the other, temporal information. 
 # Results
-The [test.py](https://github.com/RameenAbdal/Action-Recognition/blob/master/test.py) tests the input video for the actions. It also specifies the frame rate, accuracy and the predicted classes.
+The [test.py](https://github.com/RameenAbdal/Action-Recognition/blob/master/test.py) tests the input video for the actions. It also specifies the frame rate, accuracy and the predicted classes. Watch the performace:
+[![Alt text for your video](https://github.com/RameenAbdal/Action-Recognition/blob/master/Results_appendingframes/1.png) <!-- .element height="10%" width="10%" -->](https://github.com/RameenAbdal/Action-Recognition/blob/master/Results_appendingframes/bend_frame.avi?raw=true)
