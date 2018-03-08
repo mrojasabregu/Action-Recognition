@@ -4,7 +4,7 @@ It results in a significant 80 – 90 % and good frame rate (16 fps) accuracy on
 It uses optical flow and two-dimensional Convolutional Neural Network for extracting spatial features from a video, pipelined with one-dimensional Convolutional Neural Network extracting temporal features and finally fed to a dense neural network for classification. 
 The plan is to develop a computationally viable product to act on a real-time basis. 
 # Procedure
-Unlike the existing deep learning action recognition backpropagating and claculating the gradients from end to end, the algorithm uses two separate
+Unlike the existing deep learning action recognition backpropagating and calculating the gradients from end to end, the algorithm uses two separate
 networks that can be trained piecewise. This reduces the computational complexity and improves the training accuracy/speed at the same time.
 Keeping in mind the computational complexity of the task, the algorithm is as follows:
 ## Spatial Feature Extraction:
