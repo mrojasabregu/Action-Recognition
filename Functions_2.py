@@ -1,21 +1,82 @@
 from time import time
-from keras import backend as k
-# from ddfg1 import myGenerator
 import numpy as np
-# from keras.layers import Dense,Convolution1D,Input,Flatten,MaxPooling1D,Dropout
-# from keras.models import Model
-
-from os.path import isfile,join
-# from keras.models import load_model
-# from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
 import cv2
 import glob
-
 import os
 from os.path import join,isfile
-
 from keras import backend as k
 from keras.utils import np_utils
+"generates the train and test data"
+def myGenerator_optical(path,reduced_size):
+    Y_train = []
+    X_train = []
+    list = os.listdir(path)
+
+    for i in xrange(len(list)):
+        list_dir = glob.glob(path + str('/') + str(list[i]) + str('/*'))
+        total_count = 0
+        for _ in list_dir:
+            cap = cv2.VideoCapture(_)
+            # Take the first frame and convert it to gray
+            ret, frame = cap.read()
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            # Create the HSV color image
+            hsvImg = np.zeros_like(frame)
+            hsvImg[..., 1] = 255
+            count = 0
+            # n = 0
+            while True:
+                # Save the previous frame data
+                previousGray = gray
+
+                # Get the next frame
+                ret, frame = cap.read()
+
+                if ret:
+                    # Convert the frame to gray scale
+                    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+                    # Calculate the dense optical flow
+                    flow = cv2.calcOpticalFlowFarneback(previousGray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+
+                    # Obtain the flow magnitude and direction angle
+                    mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+                    # print mag, ang
+
+                    # Update the color image
+                    hsvImg[..., 0] = 0.5 * ang * 180 / np.pi
+                    hsvImg[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
+                    rgbImg = cv2.cvtColor(hsvImg, cv2.COLOR_HSV2BGR)
+                    frame = cv2.resize(np.array(rgbImg), (reduced_size, reduced_size))
+                    # print frame.shape
+                    # cv2.imshow('dense optical flow', frame )
+                    # k = cv2.waitKey(30) & 0xff
+                    # if k == 27:
+                    #     break
+
+                if ret == False:
+                    print "Number of Frames Extracted :", count
+                    break
+                count = count + 1
+                X_train.append(frame)
+
+            total_count = total_count + count
+
+        for j in xrange(total_count):
+            Y_train.append(i)
+
+        print 'Directory ${0}$ Extracted with total frames : {1}\n'.format(list[i], total_count)
+
+    print ('Sucessfully Extracted {0} frames with {1} labels'.format(len(X_train), len(Y_train)))
+
+    Y_train = np_utils.to_categorical(Y_train, len(list))
+    X_train = np.array(X_train).reshape(-1, reduced_size, reduced_size, 3)
+    print X_train.shape,Y_train.shape
+    # X_train = np.array(X_train)
+    # if yield_bool == False:
+    return X_train, Y_train
 
 def myGenerator(path,reduced_size):
     Y_train=[]
@@ -73,6 +134,8 @@ def myGenerator(path,reduced_size):
     # if yield_bool == False:
     return X_train, Y_train
 
+" generates the vectors from the two dimensional convolution neural network and compiles the sequences of frames to be fed " \
+"to one dimensional neural network to extract temporal features from the frames"
 class piece_wise:
     def __init__(self,model,data,label,seq_size,layer_idx,*args,**kwargs):
         self.args = args
@@ -91,7 +154,7 @@ class piece_wise:
         # self.acti = []
         # self.label2 = []
         self.arr = np.arange(0,(self.examples-self.seq))
-        # np.random.shuffle(self.arr)
+        np.random.shuffle(self.arr)
     def gen_seq(self):
         "This function yields for the sequence training with seq prompted"
         # data = self.data
@@ -174,13 +237,16 @@ class piece_wise:
         #
         # yield np.array(self.act).reshape(1,10,64),np.array(self.la).reshape((self.count2,self.seq))
 
+"returns the metrics for classification and visualization"
 class test:
-    def __init__(self, path, file_no, model_2d, model_1d, seq_size,Nodes_flatten,reduced_size,layer_no,*args,**kwargs):
+    def __init__(self, path, file_no, model_2d, model_1d, seq_size,Nodes_flatten,reduced_size,optical,consec,layer_no,*args,**kwargs):
         self.args = args
         self.kwargs = kwargs
         self.path = path
+        self.optical = optical
         self.layer_no = layer_no
         self.r_size = reduced_size
+        self.consec = consec
         # self.test_name = test_name
         self.file_no = file_no
         self.model_1d = model_1d
@@ -189,105 +255,182 @@ class test:
         self.Nodes_flatten = Nodes_flatten
         self.get_activations = k.function([self.model_2d.layers[0].input,k.learning_phase()], self.model_2d.layers[layer_no].output)
         self.preds = []
-        self.list = ['bend', 'jack', 'jump', 'pjump', 'run', 'side', 'skip', 'walk', 'wave1', 'wave2']
+        # self.list = ['bend', 'jack', 'jump', 'pjump', 'run', 'side', 'skip', 'walk', 'wave1', 'wave2']
+        self.list = ['Fight', 'Normal']
         # self.list = ['basketball','biking','diving','golf_swing','horse_riding','soccer_juggling','swing','tennis_swing','trampoline_jumping','voleyball_spiking','walking']
     def test_gen(self):
         file = [join(self.path, f) for f in os.listdir(self.path) if isfile(join(self.path, f))][self.file_no]
         cap = cv2.VideoCapture(file)
-        back_sep = cv2.createBackgroundSubtractorKNN()
+        # cap = cv2.VideoCapture(0)
         data = []
-
         count = 0
-        while (cap.isOpened()):
+        if self.optical == True:
+            y = 3
             ret, frame = cap.read()
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            hsvImg = np.zeros_like(frame)
+            hsvImg[..., 1] = 255
+            while True:
+                previousGray = gray
+                ret, frame = cap.read()
 
-            if (ret == True):
-                odd = frame.shape
-                # mask = np.zeros(np.array(frame).shape[:2],np.uint8)
-                # bgd = np.zeros((1,65),np.float64)
-                # fwd = np.zeros((1,65),np.float64)
-                # rect = (20,20,50,50)
-                # cv2.grabCut(frame,mask,rect,bgd,fwd,5,cv2.GC_INIT_WITH_RECT)
-                # mask2 = np.where((mask==2)|(mask==0),0,1).astype('uint8')
-                # frame= frame*mask2[:,:,np.newaxis]
-                # plt.imshow(frame),plt.colorbar(),plt.show()
-                # dst = cv2.fastNlMeansDenoisingColored(frame, None, 10, 10, 7, 21)
-                dump = back_sep.apply(frame)
-                # frame = cv2.cvtColor(frame,cv2.COLOR_RGB2GRAY)
-                # print frame.shape
-                retu, thr = cv2.threshold(dump, 0 , 136 , cv2.THRESH_BINARY)
-                dump = cv2.resize(thr, (self.r_size, self.r_size))
-                print np.array(dump).shape
-                count = count + 1
-                # cv2.imshow('frame',dump)
-                # k = cv2.waitKey(30) & 0xff
-                # if k ==27:
-                #  break
-                data.append(dump)
-                # r = count
-            if ret == False:
-                    appen = []
-                    for _ in xrange(self.seq_size - 9):
-                        appended = [0 for i in xrange(self.r_size * self.r_size)]
-                        appended = np.array(appended).reshape(self.r_size,self.r_size)
-                        appen.append(appended)
-                    #     # print "hoooooo"
-                    #     print np.array(appen).shape
-                    data = np.vstack((np.array(data), np.array(appen)))
-                    r = count + self.seq_size-9
+                if ret:
+                    # Convert the frame to gray scale
+                    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-                    break
+                    # Calculate the dense optical flow
+                    flow = cv2.calcOpticalFlowFarneback(previousGray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
 
-        return np.array(data).reshape(-1,self.r_size,self.r_size,1), file, r
+                    # Obtain the flow magnitude and direction angle
+                    mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+                    # print mag, ang
+
+                    # Update the color image
+                    hsvImg[..., 0] = 0.5 * ang * 180 / np.pi
+                    hsvImg[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
+                    rgbImg = cv2.cvtColor(hsvImg, cv2.COLOR_HSV2BGR)
+                    dump = cv2.resize(rgbImg, (self.r_size, self.r_size))
+                    # cv2.imshow('dense optical flow', rgbImg)
+                    # if cv2.waitKey(30) & 0xFF == ord('q'):
+                    #     break
+                    # print np.array(dump).shape
+                    count = count + 1
+                    # print count
+                    data.append(dump)
+                    r = count
+                if ret == False:
+                        if self.consec == False:
+                            appen = []
+                            mod = len(data) % self.seq_size
+                            if mod >= self.seq_size / 2:
+                                for _ in xrange(self.seq_size - mod):
+                                    appended = [0 for i in xrange(self.r_size * self.r_size*3)]
+                                    appended = np.array(appended).reshape(self.r_size, self.r_size,3)
+                                    appen.append(appended)
+                                    #     # print "hoooooo"
+                                    #     print np.array(appen).shape
+                                data = np.vstack((np.array(data), np.array(appen)))
+                                print "Empty frames added:", self.seq_size - mod
+
+                                r = count + self.seq_size - mod
+                                break
+                            data = data[0:len(data) - mod]
+                            r = count - mod
+                            print "Frames removed:", mod
+                            break
+                        break
+        if self.optical == False:
+             y = 1
+             back_sep = cv2.createBackgroundSubtractorKNN()
+             while (cap.isOpened()):
+                    ret, frame = cap.read()
+
+                    if (ret == True):
+                        odd = frame.shape
+                        # mask = np.zeros(np.array(frame).shape[:2],np.uint8)
+                        # bgd = np.zeros((1,65),np.float64)
+                        # fwd = np.zeros((1,65),np.float64)
+                        # rect = (20,20,50,50)
+                        # cv2.grabCut(frame,mask,rect,bgd,fwd,5,cv2.GC_INIT_WITH_RECT)
+                        # mask2 = np.where((mask==2)|(mask==0),0,1).astype('uint8')
+                        # frame= frame*mask2[:,:,np.newaxis]
+                        # plt.imshow(frame),plt.colorbar(),plt.show()
+                        # dst = cv2.fastNlMeansDenoisingColored(frame, None, 10, 10, 7, 21)
+                        dump = back_sep.apply(frame)
+                        # frame = cv2.cvtColor(frame,cv2.COLOR_RGB2GRAY)
+                        # print frame.shape
+                        retu, thr = cv2.threshold(dump, 0 , 136 , cv2.THRESH_BINARY)
+                        dump = cv2.resize(thr, (self.r_size, self.r_size))
+                        # print np.array(dump).shape
+                        count = count + 1
+                        # cv2.imshow('frame',dump)
+                        # k = cv2.waitKey(30) & 0xff
+                        # if k ==27:
+                        #  break
+                        data.append(dump)
+                        r = count
+                    if ret == False:
+                        if self.consec == False:
+                            appen = []
+                            mod = len(data) % self.seq_size
+                            if mod >= self.seq_size/2:
+                              for _ in xrange(self.seq_size-mod):
+                                appended = [0 for i in xrange(self.r_size * self.r_size)]
+                                appended = np.array(appended).reshape(self.r_size,self.r_size)
+                                appen.append(appended)
+                            #     # print "hoooooo"
+                            #     print np.array(appen).shape
+                              data = np.vstack((np.array(data), np.array(appen)))
+                              print "Empty frames added:", self.seq_size-mod
+
+                              r = count + self.seq_size-mod
+                              break
+                            data = data[0:len(data)-mod]
+                            r = count - mod
+                            print "Frames removed:", mod
+                            break
+                        break
+        return np.array(data).reshape(-1,self.r_size,self.r_size,y), file, r
         # return np.array(data), file
     def test(self):
         data, file, count1 = self.test_gen()
         print "Video shape after operation:", data.shape
-        i = 0
+        i = -1
         timer = []
         cap = cv2.VideoCapture(file)
-        # out = cv2.VideoWriter('O1.avi',-1,20.0,(180,144))
-        #while (1):
-
         while (cap.isOpened()):
             ret, frame = cap.read()
             if ret == False:
                  break
-            # act = self.get_activations([data[i*self.seq_size:(i + 1)* self.seq_size],0])
+            i = i + 1
+            if i == count1-self.seq_size+1:
+               break
             start = time()
-            act = self.get_activations([data[i:i + self.seq_size], 0]).reshape(1, self.seq_size, self.Nodes_flatten)
+            if self.consec == False:
+              act = self.get_activations([data[i*self.seq_size:(i + 1)* self.seq_size],0]).reshape(1, self.seq_size, self.Nodes_flatten)
+            if self.consec == True:
+              act = self.get_activations([data[i:i + self.seq_size], 0]).reshape(1, self.seq_size, self.Nodes_flatten)
             # print np.array(act).shape
             # if act.shape != (self.seq_size,self.Nodes_flatten):
             #
             #     break
             # act = np.reshape(act,(1, self.seq_size, self.Nodes_flatten))
+            pre = self.model_1d.predict(act)
+            at = np.argmax(pre)
+            ac = np.max(act)
+            stop = time() - start
+            timer.append(stop)
+            self.preds.append(at)
+            if self.consec == True:
+                "Remove this for saving part~~~~"
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                cv2.putText(frame, str(self.list[at] + " " + str(ac)), (70, 140), font, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                cv2.imshow('Prediction', frame)
+                "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 
-            at = np.argmax(self.model_1d.predict(act))
-            "Remove this for saving part~~~~"
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            cv2.putText(frame, str(self.list[at]), (70, 140), font, 1, (0, 255, 0), 2, cv2.LINE_AA)
-            cv2.imshow('Prediction', frame)
-            "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-            #stop = time()- start
-            #timer.append(stop)
-            #self.preds.append(at)
-            "Remove this for saving part~~~~"
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                 break
+                "Remove this for saving part~~~~"
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                     break
         cap.release()
         cv2.destroyAllWindows()
         "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
         Unique, count = np.unique(np.array(self.preds), return_counts=True)
         print Unique,count
-        # i = i + 1
-        # if i == count1-self.seq_size+1:
-        #     break
-
-        return self.preds, Unique[np.argmax(count)],file, Unique, count, timer
+        j = 0
+        den = np.sum(count)
+        tim = (float(np.sum(timer)) / den).round(2)
+        print "Total Frames Extracted:", den
+        for _ in Unique:
+            print "Predicted:", '$', self.list[_], '$', "with count:", count[j], "Accuracy:", (
+                (float(count[j]) / den) * 100).round(2), "%"
+            j = j + 1
+        print "Average time taken per frame:", tim, "sec"
+        print "Average frame rate:", (float(1) / tim).round(2)
+        return self.preds, Unique[np.argmax(count)],file, Unique, count, timer,ac
 
     def render_video(self):
 
-     pred, argmax, file, Unique, count, timer = self.test()
+     pred, argmax, file, Unique, count, timer,ac = self.test()
      j = 0
      den = np.sum(count)
      tim = (float(np.sum(timer)) / den).round(2)
@@ -309,7 +452,7 @@ class test:
              ret,frame = cap.read()
              if ret == True:
                  font = cv2.FONT_HERSHEY_SIMPLEX
-                 cv2.putText(frame, str(self.list[argmax]), (70,140), font, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                 cv2.putText(frame, str(self.list[argmax] + " " + str(ac)), (70,140), font, 1, (0, 255, 0), 2, cv2.LINE_AA)
                  out.write(frame)
                  cv2.imshow('Prediction' , frame)
                  if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -336,112 +479,3 @@ class test:
         # cap.release()
         # cv2.destroyAllWindows()
 
-
-# seq_size = 20
-# index = 9
-# Nodes_flatten = 16
-# classes = 10
-# nb_example_to_train = 4666
-# epochs = 1
-# layer_index = 9
-# x_batch = 10
-# path = 'C:\Users\USER\Desktop\Downloaded DataSets\Weizmann Action DataSet'
-# path = 'C:\Users\USER\Desktop\Downloaded DataSets\wiezman_test/run'
-# path = 'C:\Users\USER\Desktop\Downloaded DataSets\ucf11\UCF11_train'
-# path = 'C:\Users\USER\Desktop\Downloaded DataSets\ucf11\UCF11_test/trampoline_jumping'
-# model_2d = load_model('wiezman_backnewblack1.h5')
-# print model_2d.summary()
-# model1= load_model('WIEZMAN_back1dnewblack_seq20.h5')
-# get_attributes = k.function([model_2d.layers[0].input], [model_2d.layers[index].output])
-# data,target = myGenerator(path)
-# import pickle
-# with open('data_youtube.pickle', 'rb') as data:
-#     data = pickle.load(data)
-# with open('Label_youtube.pickle', 'rb') as target:
-#     target = pickle.load(target)
-#
-# def lala_land():
-#     data = []
-#     labels = []
-#     class_1d_input = piece_wise(model=model, data=myGenerator(path, 10)[0], label=myGenerator(path, 10)[1],
-#                                 seq_size=seq_size, layer_idx=index)
-#     gen = class_1d_input.produce_seq_from_2d()
-#     for _ in xrange(5701-seq_size):
-#
-#        gen_next =next(gen)
-#        data.append(gen_next[0])
-#        labels.append(gen_next[1])
-#
-#     return data,labels
-#
-# data,labels = lala_land()
-#
-# def lala_land_yield():
-#     while 1:
-#         for i in xrange(5701-seq_size):
-#             yield data[i:(i+seq_size)],labels[i]
-
-
-
-# tesing = test(path,0,model_2d,model1,seq_size,Nodes_flatten,False,False)
-# tesing.render_video()
-
-# def one_net(seq_size,param,classes):
-#     "This is the 1d network...."
-#
-#     inputs_1d = Input(shape=(seq_size,param))
-#
-#     _dconv = Convolution1D(nb_filter=20,filter_length=4,activation='sigmoid',border_mode='same')(inputs_1d)
-#     max = MaxPooling1D()(_dconv)
-#     _dconv2 = Convolution1D(20,3,activation='relu',border_mode='same')(max)
-#     max2 = MaxPooling1D()(_dconv2)
-#     dp = Dropout(0.3)(max2)
-#     # _deconv3 = Convolution1D(10,3,activation='relu',border_mode='same')(max2)
-#     # max3= MaxPooling1D()(_deconv3)
-#     flat = Flatten()(dp)
-#     dense = Dense(classes,activation='softmax')(flat)
-#
-#     model = Model(input=inputs_1d, output=dense,name='model_1')
-#     model.compile(optimizer="adam",loss="binary_crossentropy",metrics=['accuracy'])
-#
-#
-#     return model
-
-# import pickle
-# with open('data.pickle', 'rb') as data:
-#     data = pickle.load(data)
-# with open('Label.pickle', 'rb') as target:
-#     target = pickle.load(target)
-#
-# print "done"
-# class_1d_input = piece_wise(model=model_2d, data=data, label=target,
-#                                                        seq_size=seq_size, layer_idx=index)
-# meta_data = []
-# meta_target = []
-# count = 0
-# for _ in xrange(5104):
-#     count = count + 1
-#     print count
-#     data, target = next(class_1d_input.produce_seq_from_2d(get_attributes))
-#     meta_data.append(meta_data)
-#     meta_target.append(meta_target)
-# with open('Label.pickle', 'wb') as output:
-#     pickle.dump(meta_target, output)
-# with open('data.pickle', 'wb') as output:
-#     pickle.dump(meta_data, output)
-# model1 = one_net(seq_size,Nodes_flatten,classes)
-# print model1.summary
-# for i in xrange (10):
-#     print '/'
-#     print model1.fit(data,target)
-
-#
-# "retain the previous models and not the one net again"
-# print "*", model1.summary()
-# for _ in xrange (15):
-#
-#     class_1d_input = piece_wise(model=model_2d, data=data, label=target,
-#                                seq_size=seq_size, layer_idx=index)
-#     model1.fit_generator(class_1d_input.produce_seq_from_2d(get_attributes),nb_example_to_train,epochs)
-#
-#     model1.save('WIEZMAN_back1dnewblack_seq201.h5')

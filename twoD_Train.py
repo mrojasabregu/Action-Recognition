@@ -1,20 +1,12 @@
 from keras.layers import Input
 from keras.models import Model
-from keras.layers.core import Dense, Dropout, Activation, Flatten, Reshape
-from keras.layers.convolutional import Convolution1D, Convolution2D, MaxPooling2D
+from keras.layers.core import Dense, Flatten
+from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from keras.models import load_model
-from Functions_2 import myGenerator
-    # if yield_bool == True:
-    #     while 1:
-    #       for i in range(len(X_train)- seq_size):
-    #
-    #         yield X_train[i :(i + seq_size)],Y_train[i:(i + seq_size)]
-#
-#
-# import pickle
+from Functions_2 import myGenerator_optical
+import pickle
 
-
-# "randomize"
+"randomize video data if necessary"
 # data = []
 # target = []
 # rand = np.arange(0,(len(data_)))
@@ -35,17 +27,38 @@ from Functions_2 import myGenerator
 # with open('Label_youtube.pickle', 'rb') as target:
 #     target = pickle.load(target)
 # model = load_model('.h5')
-Path = 'C:\Users\USER\Desktop\Downloaded DataSets\Weizmann_train'
-batch_size = 32
-nb_classes = 10
-nb_epoch = 10
-red_size = 64
-nb_examples = 4599
-data,target = myGenerator(Path,red_size)
-def twod_net():
-    "This is the 2d network...."
+"Data set dirctory"
+Path = 'C:\Users\USER\Desktop\Fight data set'
+batch_size = 32; "Batch size for the Convolutional Neural Ntwork"
+nb_classes = 2;"Number of classes"
+nb_epoch = 10;"Number of Iterations for Backpropagation"
+red_size = 32;"Resize the video (N x N x 3 x t)"
+# nb_examples = 4599
 
-    inputs_2d = Input(shape=(red_size,red_size,1))
+data,target = myGenerator_optical(Path,red_size)
+"The function returns the processed extracted frames and labels from the directory. The processing involves application of Optical flow " \
+"algorithm and color coding the resultant vectors representing the magnitude and direction of Optical flow. This allows to impart " \
+"some temporal information in the frames extracted, which could be classified. The resizing is also ensured, given the computational " \
+"complexity associated with the videos."
+
+"Load processed files if already saved"
+with open('fightdata.pickle', 'wb') as output:
+      pickle.dump(data,output)
+with open('fightlabel.pickle', 'wb') as output:
+      pickle.dump(target,output)
+
+
+"Custom defined two dimensional neural network for extracting the spatial information from the processed frames. Instad of " \
+"using pretrained models, the dataset is trained from scratch to ensure that the model is highly specific to the task and" \
+"computational complexity could b easily managed "
+def twod_net(optical):
+    if optical == True:
+      inputs_2d = Input(shape=(red_size,red_size,3))
+    if optical == False:
+      inputs_2d = Input(shape=(red_size, red_size, 1))
+    " Depending on whether Optical flow or simple background subtraction is used in the extracted frames"
+
+    "Two dimensional Convolutional neural network architecture:"
 
     conv_1 = Convolution2D(2,3,3,activation='sigmoid',border_mode='same')(inputs_2d)
     pool1 = MaxPooling2D(pool_size=(2, 2))(conv_1)
@@ -69,19 +82,18 @@ def twod_net():
     dense_2= Dense(nb_classes,activation='softmax')(flat)
 
     model = Model(input=inputs_2d, output=dense_2,name='model_1')
+    "Compilation:"
     model.compile(optimizer="adam",loss="binary_crossentropy",metrics=['accuracy'])
     print "Summary of the Model:", (model.summary())
 
     return model
 
-# model = twod_net()
-model = load_model("weizmann_train_64_new.h5")
+# model = twod_net(optical=True)
+model = load_model("C:\Users\USER\PycharmProjects\iisc-hello\SU_Project\models_save\Optical_results/2D-Cnn/opticalfight32.h5")
 print model.summary()
-# print 'reaching ...'
-# model.fit_generator(myGenerator(path,10),samples_per_epoch=5701,nb_epoch=2,verbose=1)
 for _ in xrange(50):
     print "Entering Epoch", _ + 1
     model.fit(data,target,batch_size,1)
-
-    model.save('weizmann_train_64.h5')
+    "Saving the model:"
+    model.save('C:\Users\USER\PycharmProjects\iisc-hello\SU_Project\models_save\Optical_results/2D-Cnn/opticalfight32.h5')
 

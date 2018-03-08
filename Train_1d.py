@@ -3,20 +3,18 @@ from keras.models import Model
 from Functions_2 import piece_wise
 from keras import backend as k
 from keras.models import load_model
-from Functions_2 import myGenerator
-seq_size = 10
+import pickle
+seq_size = 20;" sequence size of the the videos to be taken into convolution operation for extracting the temporal information"
 param = 16
-classes =10
-index = 11
+classes =2
+index = 11;"the layer number from which vectors representing frames are extracted from the saved 2D-CNN model "
 epochs = 1
-nb_example_to_train = 4853
-# nb_example_to_test = 1025
+nb_example_to_train = 2400
 reduced_size = 32
 
-model_2d = load_model('weizmann_train_64.h5')
-path = 'C:\Users\USER\Desktop\Downloaded DataSets\Weizmann_train'
-# path2 = 'C:\Users\USER\Desktop\Downloaded DataSets\Weizmann_test'
-# val_data, val_label = myGenerator(path2,reduced_size,nb_example_to_test)
+model_2d = load_model('C:\Users\USER\PycharmProjects\iisc-hello\SU_Project\models_save\Optical_results/2D-Cnn\opticalfight32.h5')
+path = 'C:\Users\USER\Desktop\Fight data set'
+"Lstm implementaion for the classification of sequence"
 def lstm_net():
 
     inputs_1d = Input(shape=(seq_size,param))
@@ -37,15 +35,13 @@ def lstm_net():
     model.compile(optimizer="adam",loss="binary_crossentropy",metrics=['accuracy'])
     print model.summary()
     return model
-
+"One dimensional CNN implementation for classification of sequences "
 def one_net(seq_size,param,classes):
-    "This is the 1d network...."
-
     inputs_1d = Input(shape=(seq_size,param))
 
-    _dconv = Convolution1D(nb_filter=64,filter_length=3,activation='relu',border_mode='same')(inputs_1d)
+    _dconv = Convolution1D(nb_filter=10,filter_length=3,activation='relu',border_mode='same')(inputs_1d)
     max = MaxPooling1D()(_dconv)
-    _dconv2 = Convolution1D(64,3,activation='relu',border_mode='same')(max)
+    _dconv2 = Convolution1D(16,3,activation='relu',border_mode='same')(max)
     max2 = MaxPooling1D()(_dconv2)
     dp = Dropout(0.2)(max2)
     # _deconv3 = Convolution1D(10,3,activation='relu',border_mode='same')(max2)
@@ -59,51 +55,23 @@ def one_net(seq_size,param,classes):
 
     return model
 
-# model_2 = lstm_net()
-# model_2 = one_net(seq_size,param,classes)
-# model_2.save('random.h5')
-model_2 = load_model('random.h5')
-# model_2 = load_model('C:\Users\USER\PycharmProjects\iisc-hello\SU_Project\models_save\Weizmann_train_64_9812_epoch4_seq30.h5')
-# model_lstm = load_model('WIEZMAN_lstm.h5')
-get_attributes = k.function([model_2d.layers[0].input], [model_2d.layers[index].output])
-data,target = myGenerator(path,reduced_size)
-# class_val = piece_wise(model=model_2d,data= val_data,label=val_label,seq_size=seq_size,layer_idx=index)
+
+model_2 = load_model('C:\Users\USER\PycharmProjects\iisc-hello\SU_Project\models_save\Optical_results/1D-CNN/1dfight32.h5')
+
+get_attributes = k.function([model_2d.layers[0].input], [model_2d.layers[index].output]);"Extract vectors from the layers of" \
+                                                                                         "2D-CNN model"
+
+with open('fightdata.pickle', 'rb') as data:
+    data = pickle.load(data)
+with open('fightlabel.pickle', 'rb') as target:
+    target = pickle.load(target)
+
 class_1d_input = piece_wise(model=model_2d, data=data, label=target,
-                               seq_size=seq_size, layer_idx=index)
-# for __ in xrange (200):
-#     print next(class_1d_input.produce_seq_from_2d(get_attributes))
-pred1 = model_2.predict_generator(class_1d_input.produce_seq_from_2d(get_attributes),val_samples=200)
-import pickle
-# with open('scatter5.pickle', 'wb') as output:
-#    pickle.dump(pred1, output)
-with open('scatter1.pickle', 'rb') as data:
-    preda = pickle.load(data)
-with open('scatter2.pickle', 'rb') as data:
-    predb = pickle.load(data)
-with open('scatter3.pickle', 'rb') as data:
-    predc = pickle.load(data)
-with open('scatter4.pickle', 'rb') as data:
-    predd = pickle.load(data)
-with open('scatter5.pickle', 'rb') as data:
-    prede = pickle.load(data)
-# # print "done"
-# pred2 = model_2.predict_generator(class_1d_input.produce_seq_from_2d(get_attributes),val_samples=600)
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-fig = plt.figure()
-ax = fig.add_subplot(111)
-ax.scatter(preda[:,0],preda[:,1],c='b',marker='s')
-ax.scatter(predb[:,0],predb[:,1],c='r',marker='o')
-ax.scatter(predc[:,0],predc[:,1],c='g',marker='s')
-ax.scatter(predd[:,0],predd[:,1],c='y',marker='o')
-ax.scatter(prede[:,0],prede[:,1],c='w',marker='s')
+                               seq_size=seq_size, layer_idx=index);"generate the sequences one-by-one along with labels to be fed " \
+                                                                   "to a 1D-CNN model"
+"Train the 1D-CNN model:"
+for _ in xrange(1):
 
-plt.show()
-
-# for _ in xrange (1):
-#
-#     history = model_2.fit_generator(class_1d_input.produce_seq_from_2d(get_attributes),nb_example_to_train,epochs,verbose=1)
-    # print model_2.metrics_names
-    # scores = model_2.evaluate_generator(class_val.produce_seq_from_2d(get_attributes),1000)
-    # print scores
-    # model_2.save('C:\Users\USER\PycharmProjects\iisc-hello\SU_Project\models_save\Weizmann_train_64_9812_epoch5_seq30.h5')
+    history = model_2.fit_generator(class_1d_input.produce_seq_from_2d(get_attributes),nb_example_to_train,epochs,verbose=1)
+    print model_2.metrics_names
+    model_2.save('C:\Users\USER\PycharmProjects\iisc-hello\SU_Project\models_save\Optical_results/1D-CNN/1dfight32.h5')
