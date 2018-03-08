@@ -39,8 +39,8 @@ Keeping in mind the computational complexity of the task, the algorithm is as fo
 The [test.py](https://github.com/RameenAbdal/Action-Recognition/blob/master/test.py) tests the input video for the actions. It also specifies the frame rate, accuracy and the predicted classes. Watch the performace:
 
 [![Alt text for your video](https://github.com/RameenAbdal/Action-Recognition/blob/master/Results_appendingframes/1.png) <!-- .element height="10%" width="10%" -->](https://github.com/RameenAbdal/Action-Recognition/blob/master/Results_appendingframes/bend_frame.avi?raw=true)
-[![Alt text for your vide](https://github.com/RameenAbdal/Action-Recognition/blob/master/Results_appendingframes/2.png) <!-- .element height="10%" width="10%" -->](https://github.com/RameenAbdal/Action-Recognition/blob/master/Results_appendingframes/side.avi?raw=true)
-[![Alt text for your vid](https://github.com/RameenAbdal/Action-Recognition/blob/master/Results_appendingframes/3.png) <!-- .element height="10%" width="10%" -->](https://github.com/RameenAbdal/Action-Recognition/blob/master/Results_appendingframes/wave1.avi?raw=true)
+    [![Alt text for your vide](https://github.com/RameenAbdal/Action-Recognition/blob/master/Results_appendingframes/2.png) <!-- .element height="10%" width="10%" -->](https://github.com/RameenAbdal/Action-Recognition/blob/master/Results_appendingframes/side.avi?raw=true)
+    [![Alt text for your vid](https://github.com/RameenAbdal/Action-Recognition/blob/master/Results_appendingframes/3.png) <!-- .element height="10%" width="10%" -->](https://github.com/RameenAbdal/Action-Recognition/blob/master/Results_appendingframes/wave1.avi?raw=true)
 
 The work in progess for fight detection:
 
