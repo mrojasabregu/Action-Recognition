@@ -33,5 +33,7 @@ Keeping in mind the computational complexity of the task, the algorithm is as fo
     convolutional layer are extracted. These 2D feature maps are converted into 1D vectors (flattening and mapping the pixel positions from 2D to a 1D vector).
     For _N_ such frames _N_ number of such vectors are extracted (e.g., for a 50 frame video, 50 such vectors are extracted and compiled over
     one another forming a sequence). In this way the 3D video data is represented as a 2D sequence of vectors. Specifying a static sequence size,
-    a one dimensional neural network is used to extract temporal features from these sequences. In this way two separate pipelined networks used.
+    a one dimensional neural network ([1D-CN](https://github.com/RameenAbdal/Action-Recognition/blob/master/Train_1d.py)) is used to extract temporal features from these sequences. In this way two separate pipelined networks used.
     One acts as a decoder extracting mainly the spatial information and the other, temporal information. 
+# Results
+The [test.py](https://github.com/RameenAbdal/Action-Recognition/blob/master/test.py) tests the input video for the actions. It also specifies the frame rate, accuracy and the predicted classes.
